@@ -4,10 +4,10 @@
 
 Foundry consists of:
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
+- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
+- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
+- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
 
 ## Documentation
 
@@ -64,3 +64,7 @@ $ forge --help
 $ anvil --help
 $ cast --help
 ```
+
+### DETECTING STORAGE LAYOUT DIFFS
+
+https://chatgpt.com/share/66f447f5-1604-8006-8e1a-535f14c5102f
