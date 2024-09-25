@@ -20,7 +20,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { Smile } from "lucide-react";
-import { EmojiClickData } from "emoji-picker-react";
+import { EmojiClickData, EmojiStyle } from "emoji-picker-react";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -157,7 +157,11 @@ export default function CreatePoll() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="p-0">
-                <EmojiPicker onEmojiClick={handlePollEmojiSelect} />
+                <EmojiPicker
+                  lazyLoadEmojis
+                  emojiStyle={EmojiStyle.NATIVE}
+                  onEmojiClick={handlePollEmojiSelect}
+                />
               </PopoverContent>
             </Popover>
           </div>
@@ -201,6 +205,8 @@ export default function CreatePoll() {
               </PopoverTrigger>
               <PopoverContent className="p-0">
                 <EmojiPicker
+                  lazyLoadEmojis
+                  emojiStyle={EmojiStyle.NATIVE}
                   onEmojiClick={(emojiObject) =>
                     handleOptionEmojiSelect(emojiObject)
                   }
@@ -256,6 +262,8 @@ export default function CreatePoll() {
                           </PopoverTrigger>
                           <PopoverContent className="p-0">
                             <EmojiPicker
+                              lazyLoadEmojis
+                              emojiStyle={EmojiStyle.NATIVE}
                               onEmojiClick={(emojiObject) =>
                                 handleOptionEmojiSelect(emojiObject, option.id)
                               }
