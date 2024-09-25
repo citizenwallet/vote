@@ -40,9 +40,4 @@ contract VoteDeploy is Script {
 
         vm.stopBroadcast();
     }
-
-    function getVoteBytecode(address _owner) public pure returns (bytes memory) {
-        bytes memory bytecode = type(Vote).creationCode;
-        return abi.encodePacked(bytecode, abi.encode(_owner));
-    }
 }
