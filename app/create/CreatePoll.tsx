@@ -7,7 +7,7 @@ import {
   Draggable,
   OnDragEndResponder,
 } from "@hello-pangea/dnd";
-import { Trash2, GripVertical, Pencil } from "lucide-react";
+import { Trash2, GripVertical, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +21,14 @@ import {
 } from "@/components/ui/popover";
 import { Smile } from "lucide-react";
 import { EmojiClickData, EmojiStyle } from "emoji-picker-react";
-import { Poll } from "@/services/poll";
+import { createPollCallData, PollCreatedEvent } from "@/services/poll";
+import { useAccount } from "@/services/cw/account";
+import { Config } from "@/services/cw/config";
+import { useBundler } from "@/services/cw/bundler";
+import { hexlify } from "ethers";
+import { abi as voteAbi } from "@/abi/Vote.json";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -32,10 +39,16 @@ type PollOption = {
 };
 
 export default function CreatePoll({
-  onSubmit,
+  voteContractAddress,
+  community,
 }: {
-  onSubmit: (poll: Poll) => Promise<string>;
+  voteContractAddress: string;
+  community: Config;
 }) {
+  const { toast } = useToast();
+
+  const router = useRouter();
+
   const [pollName, setPollName] = useState("");
   const [pollEmoji, setPollEmoji] = useState("");
   const [pollDescription, setPollDescription] = useState("");
@@ -46,6 +59,17 @@ export default function CreatePoll({
   const [showOptionEmojiPicker, setShowOptionEmojiPicker] = useState(false);
   const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
   const [editingOptionName, setEditingOptionName] = useState("");
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const account = useAccount(
+    community.node.url,
+    community.erc4337.account_factory_address
+  );
+
+  console.log("account", account);
+
+  const bundler = useBundler(community);
 
   const addOption = () => {
     if (newOptionName) {
@@ -77,15 +101,59 @@ export default function CreatePoll({
   };
 
   const handleCreatePoll = async () => {
-    // Here you would typically send the poll data to your backend
-    console.log({ pollName, pollEmoji, pollDescription, options });
-    // const hash = await onSubmit({
-    //   name: pollName,
-    //   emoji: pollEmoji,
-    //   description: pollDescription,
-    //   options,
-    // });
-    // console.log("hash", hash);
+    if (!account) {
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      // Here you would typically send the poll data to your backend
+      console.log({ pollName, pollEmoji, pollDescription, options });
+
+      const callData = createPollCallData({
+        name: pollName,
+        emoji: pollEmoji,
+        description: pollDescription,
+        options,
+      });
+
+      const txHash = await bundler.submit(
+        account.signer,
+        account.address,
+        voteContractAddress,
+        hexlify(callData),
+        {}
+      );
+
+      console.log("txHash", txHash);
+
+      const receipt = await bundler.awaitSuccess(txHash);
+
+      console.log("receipt", receipt);
+
+      const eventData = bundler.extractEventData(
+        receipt,
+        voteAbi,
+        "PollCreated"
+      ) as unknown as PollCreatedEvent;
+
+      console.log("eventData", eventData);
+
+      router.push(`/poll/${eventData.pollId}`);
+      return;
+    } catch (error: unknown) {
+      console.error("Error creating poll", error);
+
+      toast({
+        title: "Error creating poll",
+        description:
+          error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+    }
+
+    setSubmitting(false);
   };
 
   const handlePollEmojiSelect = (emojiObject: EmojiClickData) => {
@@ -326,9 +394,12 @@ export default function CreatePoll({
 
       <Button
         onClick={handleCreatePoll}
+        disabled={!account || submitting}
         className="w-full bg-teal-500 hover:bg-teal-600"
       >
-        Create Poll
+        Create Poll{" "}
+        {!account ||
+          (submitting && <Loader2 className="h-4 w-4 ml-2 animate-spin" />)}
       </Button>
     </div>
   );

@@ -1,27 +1,21 @@
-import IPFSService from "@/services/ipfs";
 import CreatePoll from "./CreatePoll";
-import { Poll } from "@/services/poll";
-
-const ipfsService = new IPFSService(
-  process.env.PINATA_BASE_URL!,
-  process.env.PINATA_API_KEY!,
-  process.env.NEXT_PUBLIC_IPFS_GATEWAY!
-);
+import { readCommunityConfig } from "@/services/cw/config";
 
 export default function Page() {
-  const createPoll = async (poll: Poll) => {
-    "use server";
+  const community = readCommunityConfig();
+  if (!community) {
+    return <div>Community not found</div>;
+  }
 
-    if (poll.options.length === 0) {
-      throw new Error("No options defined");
-    }
+  const voteContractAddress = process.env.VOTE_CONTRACT_ADDRESS;
+  if (!voteContractAddress) {
+    return <div>Vote contract address not found</div>;
+  }
 
-    const hash = await ipfsService.uploadJSON(
-      poll as unknown as Record<string, unknown>
-    );
-    console.log("hash", hash);
-    return hash;
-  };
-
-  return <CreatePoll onSubmit={createPoll} />;
+  return (
+    <CreatePoll
+      voteContractAddress={voteContractAddress}
+      community={community}
+    />
+  );
 }
