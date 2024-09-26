@@ -1,6 +1,6 @@
 import {
   Contract,
-  encodeBytes32String,
+  getAddress,
   getBytes,
   JsonRpcApiProvider,
   solidityPackedKeccak256,
@@ -54,6 +54,35 @@ export const getPollDetails = async (
   };
 };
 
+export const getPollOwner = async (
+  provider: JsonRpcApiProvider,
+  contractAddress: string,
+  pollId: string
+): Promise<string> => {
+  const contract = new Contract(contractAddress, voteAbi.abi, provider);
+  return await contract.pollOwners(pollId);
+};
+
+export const hasPollTokenVoted = async (
+  provider: JsonRpcApiProvider,
+  contractAddress: string,
+  pollId: string,
+  token: string
+): Promise<boolean> => {
+  const contract = new Contract(contractAddress, voteAbi.abi, provider);
+  return await contract.pollTokens(pollId, token);
+};
+
+export const hasAuthorizedPollToken = async (
+  provider: JsonRpcApiProvider,
+  contractAddress: string,
+  pollOwner: string,
+  token: string
+): Promise<boolean> => {
+  const contract = new Contract(contractAddress, voteAbi.abi, provider);
+  return await contract.pollOwnerAuthorizedTokens(pollOwner, token);
+};
+
 export const getPollVotes = async (
   provider: JsonRpcApiProvider,
   contractAddress: string,
@@ -62,6 +91,15 @@ export const getPollVotes = async (
   const contract = new Contract(contractAddress, voteAbi.abi, provider);
   const pollVotes: bigint[] = await contract.pollVotes(pollId);
   return pollVotes.map((vote) => Number(vote));
+};
+
+export const getPollTotalVotes = async (
+  provider: JsonRpcApiProvider,
+  contractAddress: string,
+  pollId: string
+): Promise<number> => {
+  const contract = new Contract(contractAddress, voteAbi.abi, provider);
+  return await contract.pollTotalVotes(pollId);
 };
 
 export const createPollCallData = (poll: Poll) =>
@@ -110,11 +148,15 @@ export const generateVoter = (
   contractAddress: string,
   pollOwner: string,
   serialNumber: string
-) => {
-  return solidityPackedKeccak256(
+): string => {
+  const hash = solidityPackedKeccak256(
     ["address", "address", "bytes32"],
     [contractAddress, pollOwner, getSerialHash(serialNumber)]
   );
+  // Convert the last 20 bytes of the hash to an address
+  const addressHex = hash.slice(-40); // Take the last 40 characters (20 bytes)
+  // Format and checksum the address
+  return getAddress(`0x${addressHex}`);
 };
 
 export const generatePollToken = (
@@ -126,4 +168,9 @@ export const generatePollToken = (
     ["address", "address", "address"],
     [contractAddress, pollOwner, voter]
   );
+};
+
+export const getVoteEventTopic = () => {
+  // TODO: use the abi
+  return "0xc11ee7452c2f2c2f4869b58e1d19ff51cf0580a58ec71e02064a290622511529";
 };

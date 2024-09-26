@@ -49,7 +49,7 @@ contract Vote is Initializable, OwnableUpgradeable, UUPSUpgradeable, AccessContr
 
     event PollCreated(bytes32 indexed pollId, bytes name, bytes emoji);
     event PollClosed(bytes32 indexed pollId);
-    event PollVoted(bytes32 indexed pollId, uint256 indexed optionIndex, uint256 votes, uint256 totalVotes);
+    event PollVoted(bytes32 indexed pollId, uint256 indexed optionIndex);
     event TokenAdded(address indexed pollOwner, bytes32 indexed token);
     event TokenRemoved(address indexed pollOwner, bytes32 indexed token);
 
@@ -113,7 +113,7 @@ contract Vote is Initializable, OwnableUpgradeable, UUPSUpgradeable, AccessContr
 
         pollTokens[pollId][token] = true;
 
-        emit PollVoted(pollId, optionIndex, _pollVotes[pollId][optionIndex], pollTotalVotes[pollId]);
+        emit PollVoted(pollId, optionIndex);
     }
 
     function addToken(bytes32 token) public {

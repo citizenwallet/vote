@@ -30,6 +30,8 @@ export default function NFCScanner({
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
+  const [voters, setVoters] = useState<string[]>([]);
+
   const account = useAccount(
     config.node.url,
     config.erc4337.account_factory_address
@@ -107,6 +109,8 @@ export default function NFCScanner({
       setStatus("URL written successfully!");
       setError("");
 
+      setVoters([...voters, url.replace(`${siteBaseUrl}/voter/`, "")]);
+
       setTimeout(() => {
         setStatus("");
       }, 3000);
@@ -116,6 +120,10 @@ export default function NFCScanner({
     }
 
     writingRef.current = false;
+  };
+
+  const handleCopyVoters = () => {
+    navigator.clipboard.writeText(voters.join(","));
   };
 
   return (
@@ -178,6 +186,24 @@ export default function NFCScanner({
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
+          )}
+
+          {voters.length > 0 && (
+            <div>
+              <h2 className="text-lg font-bold">Voters</h2>
+
+              {voters.map((voter) => (
+                <p key={voter} className="text-sm">
+                  {voter}
+                </p>
+              ))}
+
+              <div className="w-full flex justify-center items-center">
+                <Button className="mt-2" onClick={handleCopyVoters}>
+                  Copy Voters
+                </Button>
+              </div>
+            </div>
           )}
         </>
       )}
