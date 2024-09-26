@@ -47,6 +47,8 @@ export default async function PollPage({
       poll={pollDetails}
       votes={pollVotes}
       totalVotes={pollVotes.reduce((acc, curr) => acc + curr, 0)}
+      config={community}
+      contractAddress={voteContractAddress}
     />
   );
 }

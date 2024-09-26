@@ -2,7 +2,7 @@
 
 import { QRCodeSVG } from "qrcode.react";
 import { Card } from "@/components/ui/card";
-import { Poll } from "@/services/poll";
+import { getVoteEventTopic, Poll } from "@/services/poll";
 import {
   ChartConfig,
   ChartContainer,
@@ -10,6 +10,10 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { useEffect, useMemo, useState } from "react";
+import { Event, EventsService, VoteData } from "@/services/cw/events";
+import { Config } from "@/services/cw/config";
+import { useSafeEffect } from "@/hooks/safeEffect";
 
 const barColors = [
   "#FF8C9E", // Stronger Pink
@@ -32,13 +36,24 @@ export default function PollDisplay({
   poll,
   votes,
   totalVotes = 0,
+  config,
+  contractAddress,
 }: {
   siteBaseUrl: string;
   pollId: string;
   poll: Poll;
   votes: number[];
   totalVotes: number;
+  config: Config;
+  contractAddress: string;
 }) {
+  const [chartData, setChartData] = useState(
+    poll.options.map((option, index) => ({
+      name: `${option.emoji} ${option.name}`,
+      total: votes[index],
+    }))
+  );
+
   const chartConfig = {
     value: {
       label: "Votes",
@@ -48,10 +63,41 @@ export default function PollDisplay({
 
   const joinUrl = `${siteBaseUrl}/poll/${pollId}/vote`;
 
-  const chartData = poll.options.map((option, index) => ({
-    name: `${option.emoji} ${option.name}`,
-    total: votes[index],
-  }));
+  const eventsService = useMemo(() => {
+    return new EventsService(config);
+  }, [config]);
+
+  const handleVoteEvent = (event: Event<VoteData>) => {
+    console.log("Vote event received:", event);
+
+    const newChartData = [...chartData];
+
+    switch (event.type) {
+      case "update":
+        break;
+      case "new":
+        newChartData[event.data.data.optionIndex].total += 1;
+        break;
+      case "remove":
+        break;
+    }
+
+    setChartData(newChartData);
+  };
+
+  useSafeEffect(() => {
+    eventsService.connect(contractAddress, getVoteEventTopic(), {
+      "data.pollId": pollId,
+    });
+
+    // TODO: fix function deps, probs refactor this
+    eventsService.setHandler(handleVoteEvent);
+
+    return () => {
+      console.log("Disconnecting");
+      eventsService.disconnect();
+    };
+  }, [eventsService, contractAddress, pollId]);
 
   console.log(chartData);
   console.log(poll.options);
