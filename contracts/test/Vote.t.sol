@@ -33,8 +33,8 @@ contract VoteTest is Test {
         assertEq(voteContract.pollName(pollId), "Test Poll");
         assertEq(voteContract.pollEmoji(pollId), unicode"🔥");
         assertEq(voteContract.pollDescription(pollId), "This is a test poll");
-        assertEq(voteContract.pollOptions(pollId, 0), "Option 1");
-        assertEq(voteContract.pollOptions(pollId, 1), "Option 2");
+        assertEq(voteContract.pollOptions(pollId)[0], "Option 1");
+        assertEq(voteContract.pollOptions(pollId)[1], "Option 2");
     }
 
     function testClosePoll() public {
@@ -68,13 +68,15 @@ contract VoteTest is Test {
 
         voteContract.createPoll(newPoll);
 
-        // Authorize voter
-        voteContract.addVoter(voter);
+        bytes32 token = voteContract.generatePollToken(owner, voter);
+
+        // Authorize token
+        voteContract.addToken(token);
 
         vm.prank(voter);
-        voteContract.vote(pollId, 0);
+        voteContract.vote(pollId, voter, 0);
 
-        assertEq(voteContract.pollVotes(pollId, 0), 1);
+        assertEq(voteContract.pollVotes(pollId)[0], 1);
         assertEq(voteContract.pollTotalVotes(pollId), 1);
     }
 
@@ -93,7 +95,8 @@ contract VoteTest is Test {
         voteContract.createPoll(newPoll);
 
         vm.prank(voter);
-        voteContract.vote(pollId, 0);
+
+        voteContract.vote(pollId, voter, 0);
     }
 
     function testFailVoteClosedPoll() public {
@@ -113,52 +116,60 @@ contract VoteTest is Test {
         voteContract.closePoll(pollId);
 
         // Authorize voter
-        voteContract.pollOwnerAuthorizedVoters(owner, voter);
+        bytes32 token = voteContract.generatePollToken(owner, voter);
+        voteContract.addToken(token);
 
         vm.prank(voter);
-        voteContract.vote(pollId, 0);
+
+        vm.expectRevert(Vote.Poll__PollAlreadyExists.selector);
+        voteContract.vote(pollId, voter, 0);
     }
 
     function testAddVoter() public {
         address newVoter = address(0x2);
 
-        assertFalse(voteContract.pollOwnerAuthorizedVoters(owner, newVoter));
+        bytes32 token = voteContract.generatePollToken(owner, newVoter);
 
-        voteContract.addVoter(newVoter);
+        assertFalse(voteContract.pollOwnerAuthorizedTokens(owner, token));
 
-        assertTrue(voteContract.pollOwnerAuthorizedVoters(owner, newVoter));
-        assertEq(voteContract.pollOwnerAuthorizedVoterList(owner, 0), newVoter);
+        voteContract.addToken(token);
+
+        assertTrue(voteContract.pollOwnerAuthorizedTokens(owner, token));
+        assertEq(voteContract.pollOwnerAuthorizedTokenList(owner)[0], token);
     }
 
     function testFailAddExistingVoter() public {
         address newVoter = address(0x2);
 
-        voteContract.addVoter(newVoter);
+        bytes32 token = voteContract.generatePollToken(owner, newVoter);
+
+        voteContract.addToken(token);
 
         // This should fail
-        voteContract.addVoter(newVoter);
+        vm.expectRevert(Vote.Poll__TokenAlreadyAuthorized.selector);
+        voteContract.addToken(token);
     }
 
     function testRemoveVoter() public {
         address newVoter = address(0x2);
 
-        voteContract.addVoter(newVoter);
-        assertTrue(voteContract.pollOwnerAuthorizedVoters(owner, newVoter));
+        bytes32 token = voteContract.generatePollToken(owner, newVoter);
 
-        voteContract.removeVoter(newVoter);
+        voteContract.addToken(token);
+        assertTrue(voteContract.pollOwnerAuthorizedTokens(owner, token));
 
-        assertFalse(voteContract.pollOwnerAuthorizedVoters(owner, newVoter));
+        voteContract.removeToken(token);
 
-        // Check if the voter is removed from the list
-        vm.expectRevert(); // This will catch the out-of-bounds revert
-        voteContract.pollOwnerAuthorizedVoterList(owner, 0);
+        assertFalse(voteContract.pollOwnerAuthorizedTokens(owner, token));
     }
 
     function testFailRemoveNonExistentVoter() public {
         address nonExistentVoter = address(0x3);
 
+        bytes32 token = voteContract.generatePollToken(owner, nonExistentVoter);
+
         // This should fail
-        voteContract.removeVoter(nonExistentVoter);
+        voteContract.removeToken(token);
     }
 
     function testAddAndRemoveMultipleVoters() public {
@@ -166,20 +177,21 @@ contract VoteTest is Test {
         address voter2 = address(0x3);
         address voter3 = address(0x4);
 
-        voteContract.addVoter(voter1);
-        voteContract.addVoter(voter2);
-        voteContract.addVoter(voter3);
+        bytes32 token1 = voteContract.generatePollToken(owner, voter1);
+        bytes32 token2 = voteContract.generatePollToken(owner, voter2);
+        bytes32 token3 = voteContract.generatePollToken(owner, voter3);
 
-        assertEq(voteContract.pollOwnerAuthorizedVoterList(owner, 0), voter1);
-        assertEq(voteContract.pollOwnerAuthorizedVoterList(owner, 1), voter2);
-        assertEq(voteContract.pollOwnerAuthorizedVoterList(owner, 2), voter3);
+        voteContract.addToken(token1);
+        voteContract.addToken(token2);
+        voteContract.addToken(token3);
 
-        voteContract.removeVoter(voter2);
+        assertEq(voteContract.pollOwnerAuthorizedTokenList(owner)[0], token1);
+        assertEq(voteContract.pollOwnerAuthorizedTokenList(owner)[1], token2);
+        assertEq(voteContract.pollOwnerAuthorizedTokenList(owner)[2], token3);
 
-        assertEq(voteContract.pollOwnerAuthorizedVoterList(owner, 0), voter1);
-        assertEq(voteContract.pollOwnerAuthorizedVoterList(owner, 1), voter3);
+        voteContract.removeToken(token2);
 
-        vm.expectRevert(); // This will catch the out-of-bounds revert
-        voteContract.pollOwnerAuthorizedVoterList(owner, 2);
+        assertEq(voteContract.pollOwnerAuthorizedTokenList(owner)[0], token1);
+        assertEq(voteContract.pollOwnerAuthorizedTokenList(owner)[1], token3);
     }
 }

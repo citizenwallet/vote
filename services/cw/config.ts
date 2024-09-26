@@ -31,6 +31,7 @@ export interface ConfigScan {
 
 export interface ConfigIndexer {
   url: string;
+  ws_url: string;
   ipfs_url: string;
   key: string;
 }

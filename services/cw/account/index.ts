@@ -2,10 +2,10 @@ import { storage } from "@/services/storage";
 import { Wallet } from "ethers";
 import { Signer, randomBytes, Interface, hexlify } from "ethers";
 import { useEffect, useState } from "react";
-import { abi as accountFactoryContractAbi } from "@/abi/AccountFactory.json";
+import accountFactoryContractAbi from "@/abi/AccountFactory.json";
 import { Contract } from "ethers";
 import { JsonRpcProvider } from "ethers";
-const accountFactoryInterface = new Interface(accountFactoryContractAbi);
+const accountFactoryInterface = new Interface(accountFactoryContractAbi.abi);
 
 const ACCOUNT_STORAGE_KEY = "v_account";
 

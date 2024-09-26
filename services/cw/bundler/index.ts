@@ -1,14 +1,16 @@
 import { JsonRpcProvider, ethers } from "ethers";
-import { abi as communityModuleContractAbi } from "@/abi/CommunityModule.json";
-import { abi as accountFactoryContractAbi } from "@/abi/AccountFactory.json";
-import { abi as accountContractAbi } from "@/abi/ModuleManager.json";
+import communityModuleContractAbi from "@/abi/CommunityModule.json";
+import accountFactoryContractAbi from "@/abi/AccountFactory.json";
+import accountContractAbi from "@/abi/ModuleManager.json";
 import { Config } from "../config";
 import { useMemo } from "react";
 import { TransactionReceipt } from "ethers";
 import { Log } from "ethers";
 
-const accountFactoryInterface = new ethers.Interface(accountFactoryContractAbi);
-const accountInterface = new ethers.Interface(accountContractAbi);
+const accountFactoryInterface = new ethers.Interface(
+  accountFactoryContractAbi.abi
+);
+const accountInterface = new ethers.Interface(accountContractAbi.abi);
 
 interface UserOpData {
   [key: string]: string;
@@ -214,7 +216,7 @@ export class BundlerService {
   ): Promise<Uint8Array> {
     const tokenEntryPointContract = new ethers.Contract(
       this.config.erc4337.entrypoint_address,
-      communityModuleContractAbi,
+      communityModuleContractAbi.abi,
       this.provider
     );
 

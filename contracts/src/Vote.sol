@@ -21,14 +21,14 @@ contract Vote is Initializable, OwnableUpgradeable, UUPSUpgradeable, AccessContr
     // VARIABLES
     mapping(address => uint256) public nonces;
     mapping(bytes32 => address) public pollOwners;
-    mapping(address => mapping(address => bool)) public pollOwnerAuthorizedVoters;
-    mapping(address => address[]) public pollOwnerAuthorizedVoterList;
+    mapping(address => mapping(bytes32 => bool)) public pollOwnerAuthorizedTokens;
+    mapping(address => bytes32[]) private _pollOwnerAuthorizedTokenList;
     mapping(bytes32 => bytes) public pollName;
     mapping(bytes32 => bytes) public pollEmoji;
     mapping(bytes32 => bytes) public pollDescription;
-    mapping(bytes32 => mapping(address => bool)) public pollVoters;
-    mapping(bytes32 => bytes[]) public pollOptions;
-    mapping(bytes32 => uint256[]) public pollVotes;
+    mapping(bytes32 => mapping(bytes32 => bool)) public pollTokens;
+    mapping(bytes32 => bytes[]) private _pollOptions;
+    mapping(bytes32 => uint256[]) private _pollVotes;
     mapping(bytes32 => uint256) public pollTotalVotes;
     mapping(bytes32 => bool) public pollClosed;
 
@@ -39,9 +39,10 @@ contract Vote is Initializable, OwnableUpgradeable, UUPSUpgradeable, AccessContr
     error Poll__PollDoesNotExist();
     error Poll__OnlyPollOwner();
     error Poll__PollAlreadyClosed();
-    error Poll__OnlyPollAuthorizedVoter();
-    error Poll__VoterAlreadyAuthorized();
-    error Poll__VoterNotAuthorized();
+    error Poll__OnlyPollAuthorizedToken();
+    error Poll__TokenAlreadyAuthorized();
+    error Poll__TokenNotAuthorized();
+    error Poll__TokenAlreadyUsed();
 
     ////////////////////////////////
     // EVENTS
@@ -49,8 +50,8 @@ contract Vote is Initializable, OwnableUpgradeable, UUPSUpgradeable, AccessContr
     event PollCreated(bytes32 indexed pollId, bytes name, bytes emoji);
     event PollClosed(bytes32 indexed pollId);
     event PollVoted(bytes32 indexed pollId, uint256 indexed optionIndex, uint256 votes, uint256 totalVotes);
-    event VoterAdded(address indexed pollOwner, address indexed voter);
-    event VoterRemoved(address indexed pollOwner, address indexed voter);
+    event TokenAdded(address indexed pollOwner, bytes32 indexed token);
+    event TokenRemoved(address indexed pollOwner, bytes32 indexed token);
 
     ////////////////////////////////
     // CONSTRUCTOR
@@ -74,23 +75,18 @@ contract Vote is Initializable, OwnableUpgradeable, UUPSUpgradeable, AccessContr
         _;
     }
 
-    modifier onlyPollAuthorizedVoter(address pollOwner, address voter) {
-        if (!pollOwnerAuthorizedVoters[pollOwner][voter]) revert Poll__OnlyPollAuthorizedVoter();
-        _;
-    }
-
     ////////////////////////////////
     // FUNCTIONS
 
     function createPoll(Poll memory poll) public {
         bytes32 pollId = getNextPollId();
-        if (pollOptions[pollId].length != 0) revert Poll__PollAlreadyExists();
+        if (_pollOptions[pollId].length != 0) revert Poll__PollAlreadyExists();
 
         pollName[pollId] = poll.name;
         pollEmoji[pollId] = poll.emoji;
         pollDescription[pollId] = poll.description;
-        pollOptions[pollId] = poll.options;
-        pollVotes[pollId] = new uint256[](poll.options.length);
+        _pollOptions[pollId] = poll.options;
+        _pollVotes[pollId] = new uint256[](poll.options.length);
         pollOwners[pollId] = msg.sender;
 
         nonces[msg.sender]++;
@@ -104,57 +100,76 @@ contract Vote is Initializable, OwnableUpgradeable, UUPSUpgradeable, AccessContr
         emit PollClosed(pollId);
     }
 
-    function vote(bytes32 pollId, uint256 optionIndex)
-        public
-        onlyPollAuthorizedVoter(pollOwners[pollId], msg.sender)
-        onlyOpenPoll(pollId)
-    {
-        if (pollClosed[pollId]) revert Poll__PollAlreadyClosed();
+    function vote(bytes32 pollId, address voter, uint256 optionIndex) public onlyOpenPoll(pollId) {
+        bytes32 token = generatePollToken(pollOwners[pollId], voter);
 
-        pollVotes[pollId][optionIndex]++;
+        address pollOwner = pollOwners[pollId];
+
+        if (!pollOwnerAuthorizedTokens[pollOwner][token]) revert Poll__OnlyPollAuthorizedToken();
+        if (pollTokens[pollId][token]) revert Poll__TokenAlreadyUsed();
+
+        _pollVotes[pollId][optionIndex]++;
         pollTotalVotes[pollId]++;
 
-        emit PollVoted(pollId, optionIndex, pollVotes[pollId][optionIndex], pollTotalVotes[pollId]);
+        pollTokens[pollId][token] = true;
+
+        emit PollVoted(pollId, optionIndex, _pollVotes[pollId][optionIndex], pollTotalVotes[pollId]);
     }
 
-    function addVoter(address voter) public {
-        if (isAuthorizedVoter(msg.sender, voter)) revert Poll__VoterAlreadyAuthorized();
-        if (pollOwnerAuthorizedVoterList[msg.sender].length == 0) {
-            pollOwnerAuthorizedVoterList[msg.sender] = new address[](0);
+    function addToken(bytes32 token) public {
+        if (isAuthorizedVoter(msg.sender, token)) revert Poll__TokenAlreadyAuthorized();
+        if (_pollOwnerAuthorizedTokenList[msg.sender].length == 0) {
+            _pollOwnerAuthorizedTokenList[msg.sender] = new bytes32[](0);
         }
-        pollOwnerAuthorizedVoterList[msg.sender].push(voter);
-        pollOwnerAuthorizedVoters[msg.sender][voter] = true;
+        _pollOwnerAuthorizedTokenList[msg.sender].push(token);
+        pollOwnerAuthorizedTokens[msg.sender][token] = true;
 
-        emit VoterAdded(msg.sender, voter);
+        emit TokenAdded(msg.sender, token);
     }
 
-    function removeVoter(address voter) public {
-        if (!isAuthorizedVoter(msg.sender, voter)) revert Poll__VoterNotAuthorized();
-        // Remove voter from the array
-        address[] memory voters = new address[](pollOwnerAuthorizedVoterList[msg.sender].length - 1);
+    function removeToken(bytes32 token) public {
+        if (!isAuthorizedVoter(msg.sender, token)) revert Poll__TokenNotAuthorized();
+        // Remove token from the array
+        bytes32[] memory tokens = new bytes32[](_pollOwnerAuthorizedTokenList[msg.sender].length - 1);
         uint256 index = 0;
-        for (uint256 i = 0; i < pollOwnerAuthorizedVoterList[msg.sender].length; i++) {
-            if (pollOwnerAuthorizedVoterList[msg.sender][i] == voter) {
+        for (uint256 i = 0; i < _pollOwnerAuthorizedTokenList[msg.sender].length; i++) {
+            if (_pollOwnerAuthorizedTokenList[msg.sender][i] == token) {
                 continue;
             }
-            voters[index] = pollOwnerAuthorizedVoterList[msg.sender][i];
+            tokens[index] = _pollOwnerAuthorizedTokenList[msg.sender][i];
             index++;
         }
-        pollOwnerAuthorizedVoterList[msg.sender] = voters;
-        pollOwnerAuthorizedVoters[msg.sender][voter] = false;
+        _pollOwnerAuthorizedTokenList[msg.sender] = tokens;
+        pollOwnerAuthorizedTokens[msg.sender][token] = false;
 
-        emit VoterRemoved(msg.sender, voter);
+        emit TokenRemoved(msg.sender, token);
     }
 
-    function isAuthorizedVoter(address pollOwner, address voter) internal view returns (bool) {
-        return pollOwnerAuthorizedVoters[pollOwner][voter];
+    function isAuthorizedVoter(address pollOwner, bytes32 token) internal view returns (bool) {
+        return pollOwnerAuthorizedTokens[pollOwner][token];
     }
 
     ////////////////////////////////
     // VIEW FUNCTIONS
 
+    function pollOptions(bytes32 pollId) public view returns (bytes[] memory) {
+        return _pollOptions[pollId];
+    }
+
+    function pollVotes(bytes32 pollId) public view returns (uint256[] memory) {
+        return _pollVotes[pollId];
+    }
+
+    function pollOwnerAuthorizedTokenList(address pollOwner) public view returns (bytes32[] memory) {
+        return _pollOwnerAuthorizedTokenList[pollOwner];
+    }
+
     function getNextPollId() public view returns (bytes32) {
         return keccak256(abi.encodePacked(address(this), msg.sender, nonces[msg.sender]));
+    }
+
+    function generatePollToken(address pollOwner, address voter) public view returns (bytes32) {
+        return keccak256(abi.encodePacked(address(this), pollOwner, voter));
     }
 
     ////////////////////////////////

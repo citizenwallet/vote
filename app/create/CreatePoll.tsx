@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DragDropContext,
   Droppable,
@@ -21,14 +21,21 @@ import {
 } from "@/components/ui/popover";
 import { Smile } from "lucide-react";
 import { EmojiClickData, EmojiStyle } from "emoji-picker-react";
-import { createPollCallData, PollCreatedEvent } from "@/services/poll";
+import {
+  addTokenCallData,
+  createPollCallData,
+  generatePollToken,
+  PollCreatedEvent,
+  voteCallData,
+} from "@/services/poll";
 import { useAccount } from "@/services/cw/account";
 import { Config } from "@/services/cw/config";
 import { useBundler } from "@/services/cw/bundler";
-import { hexlify } from "ethers";
-import { abi as voteAbi } from "@/abi/Vote.json";
+import { hexlify, keccak256, Wallet } from "ethers";
+import voteAbi from "@/abi/Vote.json";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { stringToKeccak256 } from "@/services/cw/utils";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -71,6 +78,47 @@ export default function CreatePoll({
 
   const bundler = useBundler(community);
 
+  const hasRunRef = useRef(false);
+
+  useEffect(() => {
+    console.log(stringToKeccak256("vote_1"));
+
+    if (!account) return;
+    const gpol = generatePollToken(
+      voteContractAddress,
+      account.address,
+      "0x5566D6D4Df27a6fD7856b7564F81266863Ba3ee8"
+    );
+
+    console.log("account", account.address);
+    console.log("wallet", "0x5566D6D4Df27a6fD7856b7564F81266863Ba3ee8");
+    console.log("gpol", hexlify(gpol));
+
+    (async () => {
+      if (!account || hasRunRef.current) return;
+      hasRunRef.current = true;
+      // const callData = addTokenCallData(gpol);
+      // const callData = voteCallData(
+      //   "0xc4d1a73a41dbebd2ca5214b5761295fde9ef38b5d9bc72e7814a46e614f092a8",
+      //   "0x5566D6D4Df27a6fD7856b7564F81266863Ba3ee8",
+      //   1
+      // );
+
+      // console.log("callData", hexlify(callData));
+      // console.log("voteContractAddress", voteContractAddress);
+
+      // const txHash = await bundler.submit(
+      //   account.signer,
+      //   account.address,
+      //   voteContractAddress,
+      //   hexlify(callData),
+      //   {}
+      // );
+
+      // console.log("txHash", txHash);
+    })();
+  }, [account, bundler, voteContractAddress]);
+
   const addOption = () => {
     if (newOptionName) {
       setOptions([
@@ -101,7 +149,7 @@ export default function CreatePoll({
   };
 
   const handleCreatePoll = async () => {
-    if (!account) {
+    if (!account || !options.length) {
       return;
     }
 
@@ -134,7 +182,7 @@ export default function CreatePoll({
 
       const eventData = bundler.extractEventData(
         receipt,
-        voteAbi,
+        voteAbi.abi,
         "PollCreated"
       ) as unknown as PollCreatedEvent;
 
@@ -394,7 +442,7 @@ export default function CreatePoll({
 
       <Button
         onClick={handleCreatePoll}
-        disabled={!account || submitting}
+        disabled={!account || submitting || !options.length}
         className="w-full bg-teal-500 hover:bg-teal-600"
       >
         Create Poll{" "}

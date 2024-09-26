@@ -34,6 +34,7 @@
     },
     "indexer": {
         "url": "https://engine.citizenwallet.xyz/v1",
+        "ws_url": "wss://engine.citizenwallet.xyz/v1",
         "ipfs_url": "https://engine.citizenwallet.xyz/v1",
         "key": "x"
     },
@@ -47,7 +48,7 @@
     },
     "safe_cards": {
         "instance_id": "vote_1",
-        "card_manager_address": "0x08Cf66957fFe61640AEa88893F6D91e6eAD517b4"
+        "card_manager_address": "0x5C96347Ee5b50F3a2b3aC698958F9cdAF4630c3B"
     },
     "plugins": [
         {
