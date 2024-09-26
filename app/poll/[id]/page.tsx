@@ -35,8 +35,15 @@ export default async function PollPage({
     return <div>Poll not found</div>;
   }
 
+  const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_BASE_URL;
+  if (!siteBaseUrl) {
+    return <div>Site base URL not found</div>;
+  }
+
   return (
     <PollDisplay
+      siteBaseUrl={siteBaseUrl}
+      pollId={id}
       poll={pollDetails}
       votes={pollVotes}
       totalVotes={pollVotes.reduce((acc, curr) => acc + curr, 0)}

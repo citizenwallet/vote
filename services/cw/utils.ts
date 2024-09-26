@@ -42,3 +42,8 @@ export function stringToKeccak256(input: string): string {
 
   return hash;
 }
+
+export function shortenAddress(address: string): string {
+  if (!address || address.length < 10) return address;
+  return `${address.slice(0, 6)}...${address.slice(-6)}`;
+}

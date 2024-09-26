@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Poll } from "@/services/poll";
 import {
   ChartConfig,
@@ -29,16 +27,18 @@ const barColors = [
 ];
 
 export default function PollDisplay({
+  siteBaseUrl,
+  pollId,
   poll,
   votes,
   totalVotes = 0,
 }: {
+  siteBaseUrl: string;
+  pollId: string;
   poll: Poll;
   votes: number[];
   totalVotes: number;
 }) {
-  const [currentUrl, setCurrentUrl] = useState("");
-
   const chartConfig = {
     value: {
       label: "Votes",
@@ -46,13 +46,7 @@ export default function PollDisplay({
     },
   } satisfies ChartConfig;
 
-  console.log(chartConfig);
-
-  useEffect(() => {
-    setCurrentUrl(window.location.href);
-  }, []);
-
-  const joinUrl = `${currentUrl}/join`;
+  const joinUrl = `${siteBaseUrl}/poll/${pollId}/vote`;
 
   const chartData = poll.options.map((option, index) => ({
     name: `${option.emoji} ${option.name}`,
@@ -69,62 +63,56 @@ export default function PollDisplay({
       </h1>
       <p className="mb-6">{poll.description}</p>
 
-      <div className="lg:flex lg:space-x-6">
+      <div className="lg:flex lg:space-x-6 w-full">
         <div className="lg:w-1/2 mb-6 lg:mb-0">
-          <Card className="p-4 h-80 w-80 flex flex-col justify-center items-center">
+          <Card className="p-4 h-full flex flex-col justify-center items-center">
             <h2 className="text-xl font-semibold mb-4">Join the Poll</h2>
             <div className="flex justify-center">
-              <QRCodeSVG value={joinUrl} size={200} />
+              <QRCodeSVG value={joinUrl} size={300} />
             </div>
-            {/* <p className="mt-4 text-center">{joinUrl}</p> */}
+          </Card>
+        </div>
+
+        <div className="lg:w-1/2">
+          <Card className="p-4 h-full flex flex-col justify-start items-center">
+            <h2 className="text-xl font-semibold mb-4">
+              Results ({votes.length})
+            </h2>
+            <div className="w-full flex">
+              <ChartContainer
+                config={chartConfig}
+                className="min-h-[400px] w-full"
+              >
+                <BarChart data={chartData}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tickLine={false}
+                    tickMargin={10}
+                    axisLine={false}
+                    fontSize={14}
+                  />
+                  <YAxis tickLine={false} tickMargin={10} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="total" fill="#2563eb" radius={4} />
+                </BarChart>
+              </ChartContainer>
+            </div>
+            <div className="flex flex-col p-4 w-full">
+              {poll.options.map((option, index) => (
+                <p key={index} className="text-lg">
+                  {option.emoji} {option.name}: {votes[index]} (
+                  {Math.round((votes[index] / totalVotes) * 100)}
+                  %)
+                </p>
+              ))}
+              <p className="text-xl font-bold mt-2">
+                Total Votes: {totalVotes}
+              </p>
+            </div>
           </Card>
         </div>
       </div>
-
-      <Card className="mt-6 p-4 flex flex-col justify-start items-center">
-        <h2 className="text-xl font-semibold mb-4">Results ({votes.length})</h2>
-        <div className="max-w-6xl w-full flex">
-          <ScrollArea className="h-[300px]">
-            <ul>
-              {/* {votes.map((vote, index) => (
-                <li key={index} className="mb-2">
-                  <span className="font-semibold">
-                    Option {vote.optionIndex + 1}:
-                  </span>{" "}
-                  {poll.options[vote.optionIndex].emoji}{" "}
-                {poll.options[vote.optionIndex].name} - Votes: {vote.votes}{" "}
-                  (Total votes: {vote.totalVotes})
-                </li>
-              ))} */}
-            </ul>
-          </ScrollArea>
-          <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-            <BarChart data={chartData}>
-              <CartesianGrid vertical={false} />
-              <XAxis
-                dataKey="name"
-                tickLine={false}
-                tickMargin={10}
-                axisLine={false}
-                fontSize={20}
-              />
-              <YAxis tickLine={false} tickMargin={10} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="total" fill="#2563eb" radius={4} />
-            </BarChart>
-          </ChartContainer>
-        </div>
-        <div className="flex flex-col p-4">
-          {poll.options.map((option, index) => (
-            <p key={index}>
-              {option.emoji} {option.name}: {votes[index]} (
-              {Math.round((votes[index] / totalVotes) * 100)}
-              %)
-            </p>
-          ))}
-          <p>Total Votes: {totalVotes}</p>
-        </div>
-      </Card>
     </div>
   );
 }

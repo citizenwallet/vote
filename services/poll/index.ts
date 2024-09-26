@@ -8,6 +8,7 @@ import {
 import voteAbi from "@/abi/Vote.json";
 import { Interface } from "ethers";
 import { formatBytesToString, formatStringToBytes } from "../cw/utils";
+import { getSerialHash } from "../nfc";
 
 const voteInterface = new Interface(voteAbi.abi);
 
@@ -103,6 +104,17 @@ const bytesToOption = (bytes: string): PollOption => {
     emoji,
     name,
   };
+};
+
+export const generateVoter = (
+  contractAddress: string,
+  pollOwner: string,
+  serialNumber: string
+) => {
+  return solidityPackedKeccak256(
+    ["address", "address", "bytes32"],
+    [contractAddress, pollOwner, getSerialHash(serialNumber)]
+  );
 };
 
 export const generatePollToken = (
