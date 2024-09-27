@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { IDetectedBarcode, Scanner } from "@yudiel/react-qr-scanner";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/services/cw/utils";
 import { Loader2, QrCodeIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useZxing } from "react-zxing";
 
 export default function VoterPage({
   siteBaseUrl,
@@ -16,13 +16,24 @@ export default function VoterPage({
 }) {
   const hasDetectedRef = useRef(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [scanned, setScanned] = useState(false);
   const router = useRouter();
-  const handleScan = (detectedCodes: IDetectedBarcode[]) => {
-    if (detectedCodes.length === 0) {
+
+  const { ref } = useZxing({
+    paused: !showScanner || scanned,
+    onDecodeResult(result) {
+      handleScan(result.getText());
+    },
+    onError(error) {
+      handleError(error);
+    },
+  });
+
+  const handleScan = (rawValue: string) => {
+    console.log("detectedCodes", rawValue);
+    if (rawValue.length === 0) {
       return;
     }
-
-    const rawValue = detectedCodes[0].rawValue;
 
     if (!rawValue || !rawValue.startsWith(siteBaseUrl)) {
       return;
@@ -34,6 +45,8 @@ export default function VoterPage({
 
     hasDetectedRef.current = true;
 
+    setScanned(true);
+
     router.push(`${rawValue}?voter=${address}`);
   };
 
@@ -43,7 +56,7 @@ export default function VoterPage({
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-start p-4">
-      <div className="w-48 h-48 bg-gray-400 rounded-full flex flex-col items-center justify-center relative mb-8">
+      <div className="w-48 h-48 bg-gray-400 rounded-full flex flex-col items-center justify-center relative mb-8 shadow-lg animate-voter-id">
         <svg viewBox="0 0 100 100" className="w-full h-full">
           <path
             id="curve-top"
@@ -61,7 +74,7 @@ export default function VoterPage({
               startOffset="50%"
               textAnchor="middle"
             >
-              TOKEN
+              VOTER ID
             </textPath>
           </text>
           <text className="fill-white" style={{ fontSize: 8 }}>
@@ -92,20 +105,15 @@ export default function VoterPage({
         </Button>
       )}
 
-      {showScanner && (
-        <div className="mt-4">
-          <Scanner
-            onScan={handleScan}
-            onError={handleError}
-            constraints={{ facingMode: "environment" }}
-            formats={["qr_code"]}
-            components={{ audio: false, zoom: false, torch: false }}
-            classNames={{
-              container: "w-64 h-64",
-            }}
-          />
+      {scanned && (
+        <div className="mt-4 w-64 h-64 rounded-lg bg-gray-200 flex justify-center items-center">
+          <div className="text-xl font-bold">Scanned</div>
         </div>
       )}
+
+      <div className="mt-4 rounded-lg overflow-hidden">
+        <video className="w-64 h-64" ref={ref} />
+      </div>
     </div>
   );
 }
