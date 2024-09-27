@@ -43,7 +43,6 @@ export class EventsService {
   private handler: ((event: Event<any>) => void) | null = null;
 
   constructor(config: Config) {
-    console.log("constructing...");
     this.url = config.indexer.url;
     this.wsUrl = config.indexer.ws_url;
   }
@@ -62,17 +61,15 @@ export class EventsService {
       url += `?${queryString}`;
     }
 
-    console.log("Connecting to", url);
-
     this.initWebSocket(url);
 
-    window.addEventListener("focus", this.handleFocus);
-    window.addEventListener("blur", this.handleBlur);
+    // window.addEventListener("focus", this.handleFocus);
+    // window.addEventListener("blur", this.handleBlur);
 
     return () => {
       this.disconnect();
-      window.removeEventListener("focus", this.handleFocus);
-      window.removeEventListener("blur", this.handleBlur);
+      // window.removeEventListener("focus", this.handleFocus);
+      // window.removeEventListener("blur", this.handleBlur);
     };
   }
 
@@ -95,14 +92,20 @@ export class EventsService {
   }
 
   private handleMessage(event: MessageEvent): void {
-    console.log("WebSocket message received:", event.data);
+    if (event.data === "pong") {
+      return;
+    }
+    if (event.data === "ping") {
+      this.ws?.send("pong");
+      return;
+    }
+
     if (this.handler) {
       this.handler(JSON.parse(event.data));
     }
   }
 
   private handleClose(event: CloseEvent): void {
-    console.log("WebSocket connection closed", event);
     if (this.isBlurred) {
       console.log("Not reconnecting because window is blurred");
       return;
@@ -135,20 +138,20 @@ export class EventsService {
     this.reconnectAttempts = 0;
   }
 
-  private handleFocus = (): void => {
-    this.isBlurred = false;
-    if (
-      this.connectedUrl &&
-      (!this.ws || this.ws.readyState === WebSocket.CLOSED)
-    ) {
-      console.log("Reconnecting on focus");
-      this.initWebSocket(this.connectedUrl);
-    }
-  };
+  // private handleFocus = (): void => {
+  //   this.isBlurred = false;
+  //   if (
+  //     this.connectedUrl &&
+  //     (!this.ws || this.ws.readyState === WebSocket.CLOSED)
+  //   ) {
+  //     console.log("Reconnecting on focus");
+  //     this.initWebSocket(this.connectedUrl);
+  //   }
+  // };
 
-  private handleBlur = (): void => {
-    this.isBlurred = true;
-    console.log("Window blurred, closing WebSocket connection");
-    this.disconnect();
-  };
+  // private handleBlur = (): void => {
+  //   this.isBlurred = true;
+  //   console.log("Window blurred, closing WebSocket connection");
+  //   this.disconnect();
+  // };
 }

@@ -10,7 +10,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Event, EventsService, VoteData } from "@/services/cw/events";
 import { Config } from "@/services/cw/config";
 import { useSafeEffect } from "@/hooks/safeEffect";
@@ -47,12 +47,14 @@ export default function PollDisplay({
   config: Config;
   contractAddress: string;
 }) {
+  const processedVotes = useRef<{ [key: string]: boolean }>({});
   const [chartData, setChartData] = useState(
     poll.options.map((option, index) => ({
       name: `${option.emoji} ${option.name}`,
       total: votes[index],
     }))
   );
+  const [total, setTotal] = useState(totalVotes);
 
   const chartConfig = {
     value: {
@@ -63,44 +65,54 @@ export default function PollDisplay({
 
   const joinUrl = `${siteBaseUrl}/poll/${pollId}/vote`;
 
+  const disconnectRef = useRef<() => void>(() => {});
+
   const eventsService = useMemo(() => {
     return new EventsService(config);
   }, [config]);
 
-  const handleVoteEvent = (event: Event<VoteData>) => {
-    console.log("Vote event received:", event);
-
-    const newChartData = [...chartData];
-
-    switch (event.type) {
-      case "update":
-        break;
-      case "new":
-        newChartData[event.data.data.optionIndex].total += 1;
-        break;
-      case "remove":
-        break;
+  const handleVoteEvent = useCallback((event: Event<VoteData>) => {
+    if (processedVotes.current[event.data.hash]) {
+      return;
     }
 
-    setChartData(newChartData);
-  };
+    processedVotes.current[event.data.hash] = true;
 
-  useSafeEffect(() => {
-    eventsService.connect(contractAddress, getVoteEventTopic(), {
-      "data.pollId": pollId,
+    setChartData((previousChartData) => {
+      if (event.type === "new") {
+        const newChartData = [...previousChartData];
+        const optionIndex = event.data.data.optionIndex;
+
+        newChartData[optionIndex] = {
+          ...newChartData[optionIndex],
+          total: newChartData[optionIndex].total + 1,
+        };
+
+        return newChartData;
+      }
+      return previousChartData;
     });
 
-    // TODO: fix function deps, probs refactor this
+    if (event.type === "new") {
+      setTotal((previousTotal) => previousTotal + 1);
+    }
+  }, []);
+
+  useSafeEffect(() => {
+    disconnectRef.current = eventsService.connect(
+      contractAddress,
+      getVoteEventTopic(),
+      {
+        "data.pollId": pollId,
+      }
+    );
+
     eventsService.setHandler(handleVoteEvent);
 
     return () => {
-      console.log("Disconnecting");
-      eventsService.disconnect();
+      disconnectRef.current();
     };
   }, [eventsService, contractAddress, pollId]);
-
-  console.log(chartData);
-  console.log(poll.options);
 
   return (
     <div className="container mx-auto p-4 max-w-6xl flex flex-col justify-center items-center">
@@ -121,9 +133,7 @@ export default function PollDisplay({
 
         <div className="lg:w-1/2">
           <Card className="p-4 h-full flex flex-col justify-start items-center">
-            <h2 className="text-xl font-semibold mb-4">
-              Results ({votes.length})
-            </h2>
+            <h2 className="text-xl font-semibold mb-4">Results</h2>
             <div className="w-full flex">
               <ChartContainer
                 config={chartConfig}
@@ -145,16 +155,14 @@ export default function PollDisplay({
               </ChartContainer>
             </div>
             <div className="flex flex-col p-4 w-full">
-              {poll.options.map((option, index) => (
+              {chartData.map((option, index) => (
                 <p key={index} className="text-lg">
-                  {option.emoji} {option.name}: {votes[index]} (
-                  {Math.round((votes[index] / totalVotes) * 100)}
+                  {option.name}: {option.total} (
+                  {total === 0 ? 0 : Math.round((option.total / total) * 100)}
                   %)
                 </p>
               ))}
-              <p className="text-xl font-bold mt-2">
-                Total Votes: {totalVotes}
-              </p>
+              <p className="text-xl font-bold mt-2">Total Votes: {total}</p>
             </div>
           </Card>
         </div>

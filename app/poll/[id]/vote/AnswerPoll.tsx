@@ -39,6 +39,7 @@ export default function Component({
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const account = useAccount(
     config.node.url,
@@ -46,10 +47,6 @@ export default function Component({
   );
 
   const bundler = useBundler(config);
-
-  const provider = useMemo(() => {
-    return new JsonRpcProvider(config.node.url);
-  }, [config.node.url]);
 
   const handleOptionSelect = (index: number) => {
     if (!confirmed) {
@@ -84,7 +81,9 @@ export default function Component({
         }
       );
 
-      router.push(`/poll/${pollId}`);
+      // TODO: fix bug with ws disconnecting when others connect
+      // router.push(`/poll/${pollId}`);
+      setSuccess(true);
       return;
     } catch (error) {
       console.error("Error confirming vote", error);
@@ -97,6 +96,14 @@ export default function Component({
     }
     setConfirmed(false);
   };
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="text-2xl font-bold">Vote submitted successfully</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
