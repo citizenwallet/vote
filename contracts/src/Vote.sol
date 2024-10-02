@@ -101,7 +101,7 @@ contract Vote is Initializable, OwnableUpgradeable, UUPSUpgradeable, AccessContr
     }
 
     function vote(bytes32 pollId, address voter, uint256 optionIndex) public onlyOpenPoll(pollId) {
-        // TODO: send token instead of voter address
+        // TODO: see if it's possible to vote without revealing the voter address
         bytes32 token = generatePollToken(pollOwners[pollId], voter);
 
         address pollOwner = pollOwners[pollId];
